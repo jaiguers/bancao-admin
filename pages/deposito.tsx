@@ -72,8 +72,7 @@ export default function DepositoPage() {
       checkout.open(function (result: any) {
         const transaction = result.transaction
         console.log("Transaction ID: ", transaction.id)
-        console.log("Transaction object: ", transaction)
-        
+
         if (transaction.status === 'APPROVED') {
           setSuccess('¡Pago procesado exitosamente!')
         } else {

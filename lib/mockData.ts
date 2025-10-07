@@ -12,10 +12,22 @@ export interface Transaction {
   referencia: string
   monto: number
   fecha: string
-  estado: 'Aceptada' | 'Abierta' | 'Borrador' | 'Pendiente' | 'Completada' | 'Cancelada'
+  estado: 'Aceptada' | 'Abierta' | 'Borrador' | 'Pendiente' | 'Completada' | 'Cancelada' | 'pending' | 'approved' | 'rejected' | 'reviewed'
   cliente: string
   vencimiento: string
   fechaCreacion: string
+  // Nuevos campos del backend
+  payment_method?: string
+  amount?: number
+  destination_account?: string
+  source_account?: string
+  beneficiary?: string
+  whatsapp_phone?: string
+  support_url?: string
+  date?: string
+  userId?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export const mockUsers: User[] = [

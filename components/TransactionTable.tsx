@@ -1,22 +1,30 @@
 import { useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, Search, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, RefreshCw, Eye } from 'lucide-react'
 import { Transaction } from '../lib/mockData'
+import ReviewModal from './ReviewModal'
 
 interface TransactionTableProps {
   data: Transaction[]
   searchPlaceholder?: string
   itemsPerPage?: number
+  onTransactionRemove?: (transactionId: string) => void
+  onTransactionAction?: (transactionId: string, action: 'approve' | 'reject' | 'review') => void
 }
 
 export default function TransactionTable({ 
   data, 
   searchPlaceholder = "Buscar transacciones...",
-  itemsPerPage = 10
+  itemsPerPage = 10,
+  onTransactionRemove,
+  onTransactionAction
 }: TransactionTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [sortField, setSortField] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [loadingTransactionId, setLoadingTransactionId] = useState<string | null>(null)
 
   // Filtrar datos basado en búsqueda
   const filteredData = useMemo(() => {
@@ -75,17 +83,25 @@ export default function TransactionTable({
     const baseClasses = "status-badge"
     switch (estado) {
       case 'Aceptada':
+      case 'approved':
         return `${baseClasses} status-accepted`
       case 'Abierta':
+      case 'open':
         return `${baseClasses} status-open`
       case 'Borrador':
+      case 'draft':
         return `${baseClasses} status-draft`
       case 'Pendiente':
+      case 'pending':
         return `${baseClasses} status-pending`
       case 'Completada':
+      case 'completed':
         return `${baseClasses} status-completed`
       case 'Cancelada':
+      case 'rejected':
         return `${baseClasses} status-cancelled`
+      case 'reviewed':
+        return `${baseClasses} status-reviewed`
       default:
         return `${baseClasses} status-draft`
     }
@@ -97,6 +113,55 @@ export default function TransactionTable({
       currency: 'USD',
       minimumFractionDigits: 2
     }).format(amount)
+  }
+
+  const handleReviewModalClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction)
+    setIsModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedTransaction(null)
+  }
+
+  const handleApprove = () => {
+    if (selectedTransaction && onTransactionAction) {
+      onTransactionAction(selectedTransaction.id, 'approve')
+    }
+    handleCloseModal()
+  }
+
+  const handleReject = () => {
+    if (selectedTransaction && onTransactionAction) {
+      onTransactionAction(selectedTransaction.id, 'reject')
+    }
+    handleCloseModal()
+  }
+
+  const handleReviewClick = async (transaction: Transaction) => {
+    if (onTransactionAction) {
+      // Mostrar loading
+      setLoadingTransactionId(transaction.id)
+      
+      try {
+        // Enviar acción al backend
+        await onTransactionAction(transaction.id, 'review')
+        
+        // Abrir modal después de enviar la acción
+        setSelectedTransaction(transaction)
+        setIsModalOpen(true)
+      } catch (error) {
+        console.error('Error al revisar transacción:', error)
+      } finally {
+        // Quitar loading
+        setLoadingTransactionId(null)
+      }
+    } else {
+      // Fallback: abrir modal si no hay función de acción
+      setSelectedTransaction(transaction)
+      setIsModalOpen(true)
+    }
   }
 
   return (
@@ -161,16 +226,19 @@ export default function TransactionTable({
               </th>
               <th
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('fechaCreacion')}
+                onClick={() => handleSort('fecha')}
               >
                 <div className="flex items-center space-x-1">
                   <span>FECHA</span>
-                  {sortField === 'fechaCreacion' && (
+                  {sortField === 'fecha' && (
                     <span className="text-primary-600">
                       {sortDirection === 'asc' ? '↑' : '↓'}
                     </span>
                   )}
                 </div>
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                ACCIONES
               </th>
             </tr>
           </thead>
@@ -195,7 +263,26 @@ export default function TransactionTable({
                   {transaction.cliente}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {transaction.fechaCreacion}
+                  {transaction.fecha || transaction.fechaCreacion}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <button
+                    onClick={() => handleReviewClick(transaction)}
+                    disabled={loadingTransactionId === transaction.id}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingTransactionId === transaction.id ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600 mr-2"></div>
+                        Procesando...
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="h-4 w-4 mr-2" />
+                        Revisar
+                      </>
+                    )}
+                  </button>
                 </td>
               </tr>
             ))}
@@ -245,6 +332,22 @@ export default function TransactionTable({
           </button>
         </div>
       </div>
+
+      {/* Modal de revisión */}
+      {selectedTransaction && (
+        <ReviewModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          transactionData={{
+            referencia: selectedTransaction.referencia,
+            monto: selectedTransaction.monto,
+            cliente: selectedTransaction.cliente,
+            support_url: selectedTransaction.support_url
+          }}
+        />
+      )}
     </div>
   )
 }

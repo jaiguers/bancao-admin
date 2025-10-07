@@ -20,6 +20,12 @@ export default function TransaccionesPage() {
     loadTransactions()
   }, [])
 
+  const handleTransactionRemove = (transactionId: string) => {
+    setTransactions(prevTransactions => 
+      prevTransactions.filter(transaction => transaction.id !== transactionId)
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -44,6 +50,7 @@ export default function TransaccionesPage() {
         data={transactions}
         searchPlaceholder="Buscar por referencia, cliente, estado o monto..."
         itemsPerPage={10}
+        onTransactionRemove={handleTransactionRemove}
       />
     </div>
   )
