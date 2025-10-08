@@ -16,10 +16,10 @@ export default function TransaccionesPage() {
   }
 
   useEffect(() => {
-    // Configurar conexión SSE
+    // Cargar transacciones iniciales (pending) y configurar conexión SSE
     const setupSSE = () => {
       try {
-        const backendUrl = process.env.NEXT_PUBLIC_URL_BASE_BACKEND || 'http://localhost:8080/api/'
+        const backendUrl = process.env.NEXT_PUBLIC_URL_BASE_BACKEND || '/api/'
         const sseUrl = `${backendUrl}sse`
         eventSourceRef.current = new EventSource(sseUrl)
         
@@ -30,7 +30,7 @@ export default function TransaccionesPage() {
             
             // Convertir datos del backend al formato de la tabla
             const newTransaction: Transaction = {
-              id: data.id,
+              id: data._id,
               referencia: data.reference,
               monto: data.amount,
               fecha: data.date,
@@ -52,19 +52,24 @@ export default function TransaccionesPage() {
               updatedAt: data.updatedAt
             }
             
-            // Agregar la nueva transacción a la tabla
+            // Mantener solo pendientes: si no está en pending, eliminar de la tabla
+            const statusLower = String(newTransaction.estado || '').toLowerCase()
+            if (statusLower !== 'pending' && statusLower !== 'review') {
+              setTransactions(prevTransactions => 
+                prevTransactions.filter(t => t.id !== newTransaction.id)
+              )
+              return
+            }
+
+            // Agregar/actualizar si está pending o review
             setTransactions(prevTransactions => {
-              // Verificar si la transacción ya existe para evitar duplicados
               const exists = prevTransactions.some(t => t.id === newTransaction.id)
               if (exists) {
-                // Actualizar transacción existente
                 return prevTransactions.map(t => 
                   t.id === newTransaction.id ? newTransaction : t
                 )
-              } else {
-                // Agregar nueva transacción al inicio
-                return [newTransaction, ...prevTransactions]
               }
+              return [newTransaction, ...prevTransactions]
             })
           } catch (error) {
             console.error('Error al parsear datos SSE:', error)
@@ -84,6 +89,54 @@ export default function TransaccionesPage() {
       }
     }
 
+    const loadInitialTransactions = async () => {
+      setLoading(true)
+      try {
+        const backendUrl = process.env.NEXT_PUBLIC_URL_BASE_BACKEND || '/api/'
+        const url = `${backendUrl}transactions`
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const mapped: Transaction[] = (Array.isArray(data) ? data : []).map((item: any) => ({
+            id: item.id,
+            referencia: item.reference,
+            monto: item.amount,
+            fecha: item.date,
+            estado: item.status,
+            cliente: item.destination_account,
+            vencimiento: '',
+            fechaCreacion: item.date,
+            payment_method: item.payment_method,
+            amount: item.amount,
+            destination_account: item.destination_account,
+            source_account: item.source_account,
+            beneficiary: item.beneficiary,
+            whatsapp_phone: item.whatsapp_phone,
+            support_url: item.support_url,
+            date: item.date,
+            userId: item.userId,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt
+          }))
+          // Mantener solo transacciones en estado pending
+          const onlyPending = mapped.filter(t => String(t.estado || '').toLowerCase() === 'pending')
+          setTransactions(onlyPending)
+        } else {
+          const text = await response.text().catch(() => response.statusText)
+          console.error('Error al cargar transacciones iniciales:', text)
+        }
+      } catch (error) {
+        console.error('Error al cargar transacciones iniciales:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadInitialTransactions()
     setupSSE()
 
     // Cleanup al desmontar el componente
@@ -102,9 +155,12 @@ export default function TransaccionesPage() {
   }
 
   // Funciones para manejar las acciones de la API
-  const handleTransactionAction = async (transactionId: string, action: 'approve' | 'reject' | 'review'): Promise<void> => {
+  const handleTransactionAction = async (
+    transactionId: string,
+    action: 'approve' | 'reject' | 'review'
+  ): Promise<{ outcome: 'ok' | 'disableReview' | 'removed' }> => {
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_URL_BASE_BACKEND || 'http://localhost:8080/api/'
+      const backendUrl = process.env.NEXT_PUBLIC_URL_BASE_BACKEND || '/api/'
       const url = `${backendUrl}transactions/${transactionId}/${action}`
       
       const response = await fetch(url, {
@@ -116,11 +172,42 @@ export default function TransaccionesPage() {
 
       if (response.ok) {
         console.log(`Transacción ${action} exitosamente`)
+        // Eliminar transacción de la tabla cuando es aprobada o rechazada
+        if (action === 'approve' || action === 'reject') {
+          setTransactions(prev => prev.filter(t => t.id !== transactionId))
+          return { outcome: 'removed' }
+        }
         // La actualización se manejará automáticamente por SSE
-      } else {
-        console.error(`Error al ${action} la transacción:`, response.statusText)
-        throw new Error(`Error al ${action} la transacción: ${response.statusText}`)
+        return { outcome: 'ok' }
       }
+
+      // Manejo especial para 409
+      if (response.status === 409) {
+        const message = (await response.text()).toLowerCase()
+
+        // Si ya está aprobada, eliminar de la tabla
+        if (message.includes('approved')) {
+          setTransactions(prev => prev.filter(t => t.id !== transactionId))
+          return { outcome: 'removed' }
+        }
+        if (message.includes('rejected')) {
+          setTransactions(prev => prev.filter(t => t.id !== transactionId))
+          return { outcome: 'removed' }
+        }
+
+        // Si está en revisión, deshabilitar botón revisar
+        if (message.includes('review')) {
+          return { outcome: 'disableReview' }
+        }
+
+        // Otro 409 desconocido
+        throw new Error(`409: ${message}`)
+      }
+
+      // Otros errores
+      const fallbackText = await response.text().catch(() => response.statusText)
+      console.error(`Error al ${action} la transacción:`, fallbackText)
+      throw new Error(`Error al ${action} la transacción: ${fallbackText}`)
     } catch (error) {
       console.error(`Error al ${action} la transacción:`, error)
       throw error

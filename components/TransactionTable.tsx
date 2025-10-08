@@ -8,7 +8,10 @@ interface TransactionTableProps {
   searchPlaceholder?: string
   itemsPerPage?: number
   onTransactionRemove?: (transactionId: string) => void
-  onTransactionAction?: (transactionId: string, action: 'approve' | 'reject' | 'review') => void
+  onTransactionAction?: (
+    transactionId: string,
+    action: 'approve' | 'reject' | 'review'
+  ) => Promise<{ outcome: 'ok' | 'disableReview' | 'removed' }>
 }
 
 export default function TransactionTable({ 
@@ -25,6 +28,7 @@ export default function TransactionTable({
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loadingTransactionId, setLoadingTransactionId] = useState<string | null>(null)
+  const [disabledReviewIds, setDisabledReviewIds] = useState<Set<string>>(new Set())
 
   // Filtrar datos basado en búsqueda
   const filteredData = useMemo(() => {
@@ -141,24 +145,26 @@ export default function TransactionTable({
 
   const handleReviewClick = async (transaction: Transaction) => {
     if (onTransactionAction) {
-      // Mostrar loading
       setLoadingTransactionId(transaction.id)
-      
       try {
-        // Enviar acción al backend
-        await onTransactionAction(transaction.id, 'review')
-        
-        // Abrir modal después de enviar la acción
+        const result = await onTransactionAction(transaction.id, 'review')
+        if (result.outcome === 'disableReview') {
+          setDisabledReviewIds(prev => new Set(prev).add(transaction.id))
+          return
+        }
+        if (result.outcome === 'removed') {
+          // Parent will remove via state; nothing to open
+          return
+        }
+        // outcome ok -> open modal
         setSelectedTransaction(transaction)
         setIsModalOpen(true)
       } catch (error) {
         console.error('Error al revisar transacción:', error)
       } finally {
-        // Quitar loading
         setLoadingTransactionId(null)
       }
     } else {
-      // Fallback: abrir modal si no hay función de acción
       setSelectedTransaction(transaction)
       setIsModalOpen(true)
     }
@@ -268,7 +274,7 @@ export default function TransactionTable({
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <button
                     onClick={() => handleReviewClick(transaction)}
-                    disabled={loadingTransactionId === transaction.id}
+                    disabled={loadingTransactionId === transaction.id || disabledReviewIds.has(transaction.id)}
                     className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loadingTransactionId === transaction.id ? (
@@ -341,6 +347,7 @@ export default function TransactionTable({
           onApprove={handleApprove}
           onReject={handleReject}
           transactionData={{
+            id: selectedTransaction.id,
             referencia: selectedTransaction.referencia,
             monto: selectedTransaction.monto,
             cliente: selectedTransaction.cliente,
