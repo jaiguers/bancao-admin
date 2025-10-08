@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { auth } from '../lib/auth'
+import Swal from 'sweetalert2'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -25,11 +26,30 @@ export default function LoginPage() {
       const result = await auth.login(email, password)
       
       if (result.success) {
+        await Swal.fire({
+          icon: 'success',
+          title: '¡Bienvenido!',
+          text: `Hola ${result.user?.name}, has iniciado sesión correctamente`,
+          timer: 2000,
+          showConfirmButton: false
+        })
         router.push('/dashboard')
       } else {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error de autenticación',
+          text: result.error || 'Credenciales inválidas',
+          confirmButtonText: 'Intentar de nuevo'
+        })
         setError(result.error || 'Error al iniciar sesión')
       }
     } catch (error) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error de conexión',
+        text: 'No se pudo conectar con el servidor. Verifica tu conexión.',
+        confirmButtonText: 'Intentar de nuevo'
+      })
       setError('Error de conexión')
     } finally {
       setIsLoading(false)
@@ -98,8 +118,8 @@ export default function LoginPage() {
           </div>
 
           <div className="text-center text-sm text-gray-600">
-            <p>Simulación de autenticación</p>
-            <p>Ingresa cualquier email y contraseña para acceder</p>
+            <p>Inicia sesión con tus credenciales</p>
+            <p>Backend: {process.env.NEXT_PUBLIC_URL_BASE_BACKEND || 'http://localhost:8080/api/'}</p>
           </div>
         </form>
       </div>

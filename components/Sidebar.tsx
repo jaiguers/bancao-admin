@@ -9,7 +9,8 @@ import {
   Menu, 
   X, 
   LogOut,
-  Home
+  Home,
+  Store
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -41,6 +42,11 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
       name: 'Transacciones',
       href: '/transacciones',
       icon: CreditCard,
+    },
+    {
+      name: 'Comercios',
+      href: '/comercios',
+      icon: Store,
     },
   ]
 
