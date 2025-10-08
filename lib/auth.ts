@@ -7,6 +7,25 @@ export interface User {
   name: string
 }
 
+// Simular autenticación de usuario
+export const authenticateUser = async ({ email, password }: { email: string; password: string }): Promise<User | null> => {
+  // Simular validación de credenciales
+  if (email && password) {
+    return {
+      id: '1',
+      email: email,
+      name: 'Administrador'
+    }
+  }
+  return null
+}
+
+// Simular generación de token
+export const generateToken = (user: User): string => {
+  // En producción, esto sería un JWT real
+  return `token_${user.id}_${Date.now()}`
+}
+
 // Simular estado de autenticación
 let isAuthenticated = false
 let currentUser: User | null = null
