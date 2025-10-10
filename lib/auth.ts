@@ -101,3 +101,12 @@ export const auth = {
   isAuthenticated,
   getCurrentUser
 }
+
+export function generateToken(user: User): string {
+  // Mock JWT token generation (replace with real implementation as needed)
+  // Example: base64 encode user id and email
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64');
+  const payload = Buffer.from(JSON.stringify({ id: user.id, email: user.email, name: user.name, role: user.role })).toString('base64');
+  const signature = 'mock-signature';
+  return `${header}.${payload}.${signature}`;
+}

@@ -12,29 +12,25 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const user = await authenticateUser({ email, password })
-    
-    if (!user) {
+    const userResponse = await authenticateUser({ email, password })
+    if (!userResponse) {
       return NextResponse.json(
         { error: 'Credenciales inválidas' },
         { status: 401 }
       )
     }
-    
-    const token = generateToken(user)
-    
+    const token = generateToken(userResponse.user)
     const response = NextResponse.json(
       { 
         message: 'Login exitoso',
         user: {
-          id: user.id,
-          email: user.email,
-          name: user.name
+          id: userResponse.user.id,
+          email: userResponse.user.email,
+          name: userResponse.user.name
         }
       },
       { status: 200 }
     )
-    
     // Establecer cookie con el token
     response.cookies.set('auth-token', token, {
       httpOnly: true,
@@ -42,7 +38,6 @@ export async function POST(request: NextRequest) {
       sameSite: 'lax',
       maxAge: 24 * 60 * 60 // 24 horas
     })
-    
     return response
   } catch (error) {
     return NextResponse.json(

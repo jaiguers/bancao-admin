@@ -1,7 +1,13 @@
 {
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
+  "/dashboard": "pages/dashboard.html",
+  "/comercios": "pages/comercios.html",
+  "/deposito": "pages/deposito.html",
+  "/": "pages/index.html",
+  "/login": "pages/login.html",
+  "/transacciones": "pages/transacciones.html",
+  "/usuarios": "pages/usuarios.html",
   "/_document": "pages/_document.js",
-  "/comercios": "pages/comercios.js",
-  "/transacciones": "pages/transacciones.js"
+  "/404": "pages/404.html"
 }
