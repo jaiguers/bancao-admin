@@ -119,7 +119,6 @@ export default function LoginPage() {
 
           <div className="text-center text-sm text-gray-600">
             <p>Inicia sesión con tus credenciales</p>
-            <p>Backend: {process.env.NEXT_PUBLIC_URL_BASE_BACKEND || 'http://localhost:8080/api/'}</p>
           </div>
         </form>
       </div>

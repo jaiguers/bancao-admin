@@ -24,6 +24,9 @@ export default function ReviewModal({
 }: ReviewModalProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => {
+  }, [transactionData])
+
   const handleImageLoad = () => {
     if (scrollContainerRef.current) {
       const scrollHeight = scrollContainerRef.current.scrollHeight

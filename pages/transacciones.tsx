@@ -22,12 +22,12 @@ export default function TransaccionesPage() {
         const backendUrl = process.env.NEXT_PUBLIC_URL_BASE_BACKEND || '/api/'
         const sseUrl = `${backendUrl}sse`
         eventSourceRef.current = new EventSource(sseUrl)
-        
+
         eventSourceRef.current.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data)
             console.log('Evento recibido:', data)
-            
+
             // Convertir datos del backend al formato de la tabla
             const newTransaction: Transaction = {
               id: data._id,
@@ -51,11 +51,11 @@ export default function TransaccionesPage() {
               createdAt: data.createdAt,
               updatedAt: data.updatedAt
             }
-            
+
             // Mantener solo pendientes: si no está en pending, eliminar de la tabla
             const statusLower = String(newTransaction.estado || '').toLowerCase()
             if (statusLower !== 'pending' && statusLower !== 'review') {
-              setTransactions(prevTransactions => 
+              setTransactions(prevTransactions =>
                 prevTransactions.filter(t => t.id !== newTransaction.id)
               )
               return
@@ -65,7 +65,7 @@ export default function TransaccionesPage() {
             setTransactions(prevTransactions => {
               const exists = prevTransactions.some(t => t.id === newTransaction.id)
               if (exists) {
-                return prevTransactions.map(t => 
+                return prevTransactions.map(t =>
                   t.id === newTransaction.id ? newTransaction : t
                 )
               }
@@ -149,7 +149,7 @@ export default function TransaccionesPage() {
   }, [])
 
   const handleTransactionRemove = (transactionId: string) => {
-    setTransactions(prevTransactions => 
+    setTransactions(prevTransactions =>
       prevTransactions.filter(transaction => transaction.id !== transactionId)
     )
   }
@@ -158,11 +158,11 @@ export default function TransaccionesPage() {
   const handleTransactionAction = async (
     transactionId: string,
     action: 'approve' | 'reject' | 'review'
-  ): Promise<{ outcome: 'ok' | 'disableReview' | 'removed' }> => {
+  ): Promise<{ outcome: 'ok' | 'disableReview' | 'removed', transaction?: Transaction }> => {
     try {
       const backendUrl = process.env.NEXT_PUBLIC_URL_BASE_BACKEND || '/api/'
       const url = `${backendUrl}transactions/${transactionId}/${action}`
-      
+
       const response = await fetch(url, {
         method: 'PUT',
         headers: {
@@ -176,6 +176,69 @@ export default function TransaccionesPage() {
         if (action === 'approve' || action === 'reject') {
           setTransactions(prev => prev.filter(t => t.id !== transactionId))
           return { outcome: 'removed' }
+        }
+
+        if (action === 'review') {
+          console.log('Transacción en revisión')
+          const body = await response.json()
+          
+          // Buscar la transacción original antes de actualizar
+          const originalTransaction = transactions.find(t => t.id === transactionId)
+          
+          // Actualizar la transacción en el estado local con los datos del backend
+          setTransactions(prevTransactions => {
+            return prevTransactions.map(t => {
+              if (t.id === body._id) {
+                // Mapear los datos del backend al formato de Transaction
+                const updatedTransaction = {
+                  ...t,
+                  id: body._id || t.id,
+                  referencia: body.reference || t.referencia,
+                  monto: body.amount || t.monto,
+                  fecha: body.date || t.fecha,
+                  estado: body.status || t.estado,
+                  cliente: body.destination_account || t.cliente,
+                  payment_method: body.payment_method || t.payment_method,
+                  amount: body.amount || t.amount,
+                  destination_account: body.destination_account || t.destination_account,
+                  source_account: body.source_account || t.source_account,
+                  beneficiary: body.beneficiary || t.beneficiary,
+                  whatsapp_phone: body.whatsapp_phone || t.whatsapp_phone,
+                  support_url: body.support_url || t.support_url,
+                  date: body.date || t.date,
+                  userId: body.userId || t.userId,
+                  createdAt: body.createdAt || t.createdAt,
+                  updatedAt: body.updatedAt || t.updatedAt
+                }
+                return updatedTransaction
+              }
+              return t
+            })
+          })
+          
+          // Crear la transacción actualizada para retornarla
+          const updatedTransactionForReturn: Transaction = {
+            ...originalTransaction!,
+            id: body._id || originalTransaction!.id,
+            referencia: body.reference || originalTransaction!.referencia,
+            monto: body.amount || originalTransaction!.monto,
+            fecha: body.date || originalTransaction!.fecha,
+            estado: body.status || originalTransaction!.estado,
+            cliente: body.destination_account || originalTransaction!.cliente,
+            payment_method: body.payment_method || originalTransaction!.payment_method,
+            amount: body.amount || originalTransaction!.amount,
+            destination_account: body.destination_account || originalTransaction!.destination_account,
+            source_account: body.source_account || originalTransaction!.source_account,
+            beneficiary: body.beneficiary || originalTransaction!.beneficiary,
+            whatsapp_phone: body.whatsapp_phone || originalTransaction!.whatsapp_phone,
+            support_url: body.support_url ?? originalTransaction!.support_url,
+            date: body.date || originalTransaction!.date,
+            userId: body.userId || originalTransaction!.userId,
+            createdAt: body.createdAt || originalTransaction!.createdAt,
+            updatedAt: body.updatedAt || originalTransaction!.updatedAt
+          }
+          
+          return { outcome: 'ok', transaction: updatedTransactionForReturn }
         }
         // La actualización se manejará automáticamente por SSE
         return { outcome: 'ok' }
@@ -219,10 +282,10 @@ export default function TransaccionesPage() {
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50 flex">
         <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
-        
+
         <div className="flex-1 flex flex-col">
           <Header onMenuClick={toggleSidebar} title="Transacciones" />
-          
+
           <main className="flex-1 p-6">
             <div className="space-y-6">
               <div className="flex items-center justify-between">

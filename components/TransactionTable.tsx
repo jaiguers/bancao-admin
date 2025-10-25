@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, Search, RefreshCw, Eye } from 'lucide-react'
 import { Transaction } from '../lib/mockData'
 import ReviewModal from './ReviewModal'
@@ -11,7 +11,7 @@ interface TransactionTableProps {
   onTransactionAction?: (
     transactionId: string,
     action: 'approve' | 'reject' | 'review'
-  ) => Promise<{ outcome: 'ok' | 'disableReview' | 'removed' }>
+  ) => Promise<{ outcome: 'ok' | 'disableReview' | 'removed', transaction?: Transaction }>
 }
 
 export default function TransactionTable({ 
@@ -29,6 +29,12 @@ export default function TransactionTable({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loadingTransactionId, setLoadingTransactionId] = useState<string | null>(null)
   const [disabledReviewIds, setDisabledReviewIds] = useState<Set<string>>(new Set())
+
+  // Log cuando cambia selectedTransaction
+  useEffect(() => {
+    if (selectedTransaction) {
+    }
+  }, [selectedTransaction])
 
   // Filtrar datos basado en búsqueda
   const filteredData = useMemo(() => {
@@ -157,7 +163,9 @@ export default function TransactionTable({
           return
         }
         // outcome ok -> open modal
-        setSelectedTransaction(transaction)
+        // Usar la transacción actualizada que viene del resultado
+        const transactionToShow = result.transaction || transaction
+        setSelectedTransaction(transactionToShow)
         setIsModalOpen(true)
       } catch (error) {
         console.error('Error al revisar transacción:', error)
